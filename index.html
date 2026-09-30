@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>분수의 덧셈과 뺄셈 마스터</title>
 <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/galmuri@latest/dist/galmuri.css" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -34,17 +35,20 @@ label{display:block;margin-top:8px;color:#b8c4ee}
 .ok{color:var(--ok)}.bad{color:var(--bad)}.dim{color:#8f9bc9}
 .foot{text-align:center;margin:26px 0 10px;color:var(--gold);font-size:22px}
 /* 첫 화면 (게임 타이틀 스타일) */
+#s-home,#loading{font-family:'Galmuri14','Galmuri11','DungGeunMo','Jua','Malgun Gothic',monospace}
 #s-home{padding:0;overflow:hidden;background:#0b1030}
 #homeCv{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
 .homeUi{position:relative;z-index:2;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:clamp(10px,3vh,34px) 14px 10px;overflow:auto}
 .logo{text-align:center;margin-bottom:clamp(8px,2.4vh,22px);animation:float 3s ease-in-out infinite}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-.logo .l0{display:inline-block;font-size:clamp(13px,3vw,20px);letter-spacing:4px;color:#fff;background:#d64545;border:3px solid #000;border-radius:99px;padding:2px 16px;box-shadow:0 3px 0 #000;transform:rotate(-2deg)}
-.logo .l1,.logo .l2{font-weight:400;color:#ffe066;-webkit-text-stroke:clamp(4px,.9vw,8px) #2a0f00;paint-order:stroke fill;text-shadow:0 clamp(4px,1vw,8px) 0 #b45309,0 clamp(8px,1.8vw,14px) 0 #000;line-height:1.05}
-.logo .l1{font-size:clamp(34px,9.5vw,84px);background:linear-gradient(#fff6a8 20%,#ffb020 70%);-webkit-background-clip:text;background-clip:text;color:transparent}
-.logo .l2{font-size:clamp(46px,13vw,116px);background:linear-gradient(#ffb0b0 10%,#ff4a4a 75%);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 6px 0 #5a0000) drop-shadow(0 10px 0 #000);animation:pulse 1.6s ease-in-out infinite}
+.logo .l0{display:inline-block;font-size:clamp(13px,3vw,20px);letter-spacing:4px;color:#fff;background:linear-gradient(#8a6cff,#5a3fe0);border:3px solid #1b0b3a;border-radius:99px;padding:2px 16px;box-shadow:0 3px 0 #1b0b3a;transform:rotate(-2deg)}
+.logo .l1,.logo .l2{font-weight:400;-webkit-text-stroke:clamp(4px,.9vw,8px) #12285f;paint-order:stroke fill;line-height:1.05}
+.logo .l1{font-size:clamp(20px,5.6vw,62px);white-space:nowrap;color:#ffffff;filter:drop-shadow(0 4px 0 #2f6bff) drop-shadow(0 8px 0 #0a1440)}
+.logo .l2{font-size:clamp(40px,11vw,104px);color:#ffd84d;-webkit-text-stroke-color:#3b1a78;filter:drop-shadow(0 6px 0 #ff7a1a) drop-shadow(0 11px 0 #1b0b3a);animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{0%,100%{transform:scale(1) rotate(-1deg)}50%{transform:scale(1.05) rotate(1deg)}}
-.logo .l3{margin-top:12px;font-size:clamp(12px,2.6vw,18px);color:#cfe3ff;text-shadow:2px 2px 0 #000;letter-spacing:2px}
+.logo .l1{margin-top:12px;line-height:1.3}
+.logo .l2{margin-top:4px;line-height:1.25;padding:0 .1em}
+.logo .l3{margin-top:14px;font-size:clamp(12px,2.6vw,18px);color:#cfe3ff;text-shadow:2px 2px 0 #000;letter-spacing:2px}
 .menu{width:min(92vw,460px);display:flex;flex-direction:column;gap:clamp(8px,1.8vh,16px);margin-top:clamp(4px,1.5vh,14px)}
 .gbtn{position:relative;display:flex;align-items:center;gap:14px;width:100%;padding:12px 16px 12px 12px;font-size:clamp(17px,4.4vw,24px);color:#fff;text-align:left;cursor:pointer;border:4px solid #000;border-radius:14px;text-shadow:2px 2px 0 #0007;box-shadow:inset 0 4px 0 #fff5,inset 0 -6px 0 #0004,0 6px 0 #000;transition:transform .08s}
 .gbtn .ic{flex:none;width:46px;height:46px;border-radius:10px;background:#0004;border:3px solid #000;display:flex;align-items:center;justify-content:center;font-size:26px}
@@ -164,7 +168,7 @@ body.touch #touch{display:block}
       <div class="l0">4학년 2학기 · 수학 RPG</div>
       <div class="l1">⚔ 분수의 덧셈과 뺄셈 ⚔</div>
       <div class="l2">마스터</div>
-      <div class="l3">몬스터를 물리치고 분수 박사가 되어라!</div>
+      <div class="l3">몬스터를 물리치고 분수 마스터가 되어라!</div>
     </div>
     <div class="menu">
       <button class="gbtn g" id="btnStudent"><span class="ic">🎮</span><span>게임 시작<small>학급 코드로 접속하기</small></span></button>
@@ -203,6 +207,7 @@ body.touch #touch{display:block}
     <button class="btn s d" id="aHome">처음으로</button>
     <button class="btn s r" id="aOut">로그아웃</button></div></div>
   <div id="aStats"></div>
+  <div class="card"><h2>🏆 명예의 전당 관리 (TOP 5)</h2><div class="dim" style="font-size:14px;margin-bottom:6px">부적절한 이름이 올라왔다면 삭제하세요. 삭제하면 그 캐릭터의 데이터가 완전히 사라져요.</div><div id="aHof" class="dim">불러오는 중…</div></div>
   <div class="card"><div class="row"><input id="aFilter" placeholder="🔍 학교 · 코드 · 교사 이메일 검색"><button class="btn s" id="aRefresh">🔄 새로고침</button><button class="btn s g" id="aCsv">⬇ CSV 내려받기</button></div></div>
   <div id="aTree" class="dim">불러오는 중…</div>
 </div></section>
@@ -1275,7 +1280,15 @@ async function loadAdmin(){
   try{const[c,p]=await Promise.all([DB.listAllClasses(),DB.listAllPlayers()]);ADATA={classes:c,players:p};renderAdmin()}
   catch(e){$('aTree').innerHTML='<span class="bad">불러오지 못했어요: '+esc(e.code||e.message)+'<br>Firestore 보안 규칙에 관리자 이메일이 등록되어 있는지 확인하세요.</span>'}
 }
-function renderAdmin(){
+function renderAdminHof(){
+  const clsBy={};ADATA.classes.forEach(c=>clsBy[c.code]=c);
+  const top=ADATA.players.slice().sort((a,b)=>(b.rank||rankOf(b))-(a.rank||rankOf(a))).slice(0,5),med=['🥇','🥈','🥉','4️⃣','5️⃣'];
+  $('aHof').innerHTML=top.length?top.map((p,i)=>{const c=clsBy[p.code]||{};return`<div class="item"><div style="font-size:26px">${med[i]}</div><div class="t"><b>${esc(p.nick)}</b> ${jobName(p)} · Lv.${p.level} · 💰${p.gold}<br><span class="dim">${esc(c.school||p.school||'')} ${c.grade||p.grade||''}학년 ${c.classNum||p.classNum||''}반 · 코드 ${p.code}</span></div><button class="btn s r" data-hof="${esc(p.id)}" data-nick="${esc(p.nick)}">🗑 삭제</button></div>`}).join(''):'아직 기록이 없어요.';
+}
+$('aHof').onclick=async e=>{const b=e.target.closest('[data-hof]');if(!b)return;
+  if(confirm('명예의 전당의 「'+b.dataset.nick+'」 캐릭터를 삭제할까요?\n캐릭터 데이터가 완전히 삭제되며 되돌릴 수 없어요.')){
+    try{await withLoading(()=>DB.delPlayer(b.dataset.hof),'삭제 중...',600);loadAdmin()}catch(er){msgBox('삭제에 실패했어요.<br><small>'+esc(er.code||er.message)+'</small>')}}};
+function renderAdmin(){renderAdminHof();
   const f=$('aFilter').value.trim().toLowerCase();
   let cls=ADATA.classes.filter(c=>!f||(c.school+c.code+(c.teacherEmail||'')).toLowerCase().includes(f));
   const by={};ADATA.players.forEach(p=>(by[p.code]=by[p.code]||[]).push(p));
@@ -1378,7 +1391,7 @@ function homeFrame(ms){
   hx.fillStyle='#8a6a3a';hx.fillRect(0,gy+2,HW,Math.round(HH*.05));hx.fillStyle='#a58348';hx.fillRect(0,gy+2,HW,1);
   for(let i=0;i<HW/9+2;i++){const x=mod(i*9-t*46,HW+18)-9,y=hz+8+((i*37)%(gy-hz-10));hx.fillStyle=i%3?'#4aa844':'#2c7a30';hx.fillRect(Math.round(x),y,1,3);hx.fillRect(Math.round(x)+2,y+1,1,2)}
   // 떠다니는 분수 기호
-  hx.font='bold 13px sans-serif';hx.textAlign='center';
+  hx.font='14px Galmuri11,sans-serif';hx.textAlign='center';
   HFR.forEach(f=>{const y=mod(f.y*HH-t*f.v*HH,HH*.8);hx.fillStyle='rgba(255,236,140,'+(.15+.25*Math.sin(t+f.r))+')';hx.fillText(f.s,Math.round(mod(f.x*HW+Math.sin(t*.6+f.r)*8,HW)),Math.round(y+HH*.05))});
   // 몬스터들(왼쪽으로 몰려옴)
   HMONS.forEach(m=>{const x=mod(m.x-t*30,HW+120)-40,hop=Math.abs(Math.sin(t*4+m.hop))*7,fr=Math.floor(t*4+m.hop)%2;const img=monSprite(m.k,MON[m.k])[fr];spr2(img,x,gy+4-hop,1.6,true)});
