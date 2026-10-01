@@ -34,6 +34,11 @@ label{display:block;margin-top:8px;color:#b8c4ee}
 .info{background:#1a3d5a;border:2px solid var(--ac);padding:8px 10px;border-radius:10px;margin:8px 0;font-size:14px}
 .ok{color:var(--ok)}.bad{color:var(--bad)}.dim{color:#8f9bc9}
 .foot{text-align:center;margin:26px 0 10px;color:var(--gold);font-size:22px}
+/* 소리 켜기/끄기 버튼 (우상단, 게임 화면은 HUD 의 버튼을 쓴다) */
+#gMute{position:fixed;top:10px;right:10px;z-index:150;width:46px;height:46px;font-size:22px;line-height:1;cursor:pointer;color:#fff;background:linear-gradient(#4a5aa8,#2a3470);border:3px solid #000;border-radius:12px;box-shadow:inset 0 3px 0 #fff4,0 4px 0 #000;display:flex;align-items:center;justify-content:center;padding:0}
+#gMute:hover{filter:brightness(1.15)}#gMute:active{transform:translateY(3px);box-shadow:inset 0 3px 0 #fff4,0 1px 0 #000}
+body.ingame #gMute{display:none}
+#s-teacher .top,#s-admin .top{padding-right:58px}
 /* 첫 화면 (게임 타이틀 스타일) */
 #s-home,#loading{font-family:'Galmuri14','Galmuri11','DungGeunMo','Jua','Malgun Gothic',monospace}
 #s-home{padding:0;overflow:hidden;background:#0b1030}
@@ -252,6 +257,7 @@ body.touch #touch{display:block}
     <div class="tb" id="bPot">🧪</div><div class="tb" id="bAtk">공격</div></div>
 </section>
 
+<button id="gMute" aria-label="소리 켜고 끄기" title="소리 끄기">🔊</button>
 <div id="banner"></div>
 
 <!-- 문제 모달 -->
@@ -313,7 +319,7 @@ const rr=(a,b)=>a+Math.random()*(b-a);
 const ri=(a,b)=>Math.floor(rr(a,b+1));
 
 /* ---------- 화면 전환 / 로딩 ---------- */
-function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));if(id==='s-home'&&window.startHome)startHome()}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));document.body.classList.toggle('ingame',id==='s-game');if(id==='s-home'&&window.startHome)startHome()}
 let loadTimer=null;
 function loadingOn(msg){$('loadMsg').textContent=msg||'불러오는 중...';$('loading').classList.add('show');const b=$('loadBar');b.style.transition='none';b.style.width='0';requestAnimationFrame(()=>{b.style.transition='width 1.4s ease-out';b.style.width='92%'})}
 function loadingOff(){const b=$('loadBar');b.style.transition='width .2s';b.style.width='100%';setTimeout(()=>$('loading').classList.remove('show'),200)}
@@ -990,7 +996,9 @@ if('ontouchstart' in window||navigator.maxTouchPoints>0)document.body.classList.
 document.addEventListener('contextmenu',e=>{if(G.run)e.preventDefault()});
 $('bShop').onclick=()=>{sfx('click');openShop()};$('bStat').onclick=()=>{sfx('click');openStat()};$('bHof').onclick=()=>{sfx('click');showHof()};
 $('bMute').onclick=()=>{toggleMute()};$('bExit').onclick=()=>exitGame();
-function toggleMute(){const m=AU.toggle();$('bMute').textContent=m?'🔇':'🔊'}
+function setMuteUi(m){$('bMute').textContent=m?'🔇':'🔊';$('gMute').textContent=m?'🔇':'🔊';$('gMute').title=$('bMute').title=m?'소리 켜기':'소리 끄기'}
+function toggleMute(){const m=AU.toggle();setMuteUi(m);try{localStorage.setItem('wm_mute',m?'1':'0')}catch(e){}}
+$('gMute').onclick=()=>toggleMute();
 function closeModals(){['m-shop','m-stat','m-hof'].forEach(i=>$(i).classList.remove('show'));G.modal=false}
 function openModal(id){$(id).classList.add('show');G.modal=true;for(const k in keys)keys[k]=false;ATK=false}
 
@@ -1087,7 +1095,7 @@ function reward(m,q,sc){
   if(up){pl.hp=stats().maxhp;sfx('level');banner('LEVEL UP!<br>Lv.'+ME.level,2200);burst(pl.x,pl.y,'#ffd54a',24,90);
     const nz=ZONES.find(z=>z.lv===ME.level);if(nz)setTimeout(()=>toast('🗺 새 지역 「'+nz.n+'」에 입장할 수 있어요!',3500),2300);saveNow()}
 }
-function kill(m){m.state='dead';m.rt=m.boss?120:25;G.parts.length<400&&burst(m.x,m.y,m.boss?'#ff6a1a':'#ffffff',m.boss?40:14,90);sfx('kill');ME.kills++;
+function kill(m){if(m.boss)setTimeout(saveNow,300);m.state='dead';m.rt=m.boss?120:25;G.parts.length<400&&burst(m.x,m.y,m.boss?'#ff6a1a':'#ffffff',m.boss?40:14,90);sfx('kill');ME.kills++;
   if(m.boss){if(!ME.bosses.includes(m.z))ME.bosses.push(m.z);banner('👑 보스 격파!',2200);$('bossbar').style.display='none'}}
 function bossShoot(m,ring){const n=ring?16:8+m.phase*3,off=rr(0,6.28),col=m.key==='dragon'?'#ff7a1a':'#c05aff';
   for(let i=0;i<n;i++){const a=off+i*6.283/n;G.eprojs.push({x:m.x,y:m.y,vx:Math.cos(a)*52,vy:Math.sin(a)*52,life:3.2,dmg:Math.round(m.dmg*.6),col})}sfx('fire')}
@@ -1246,23 +1254,29 @@ function openStat(){const s=stats(),tot=ME.correct+ME.wrong;
   <tr><td>✅ 정답</td><td>${ME.correct}개</td><td>📊 정답률</td><td>${tot?Math.round(ME.correct/tot*100):0}%</td></tr></tbody></table></div>
   <button class="btn g" id="stPot">🧪 물약 사용 (Q)</button>`;
   $('stPot').onclick=()=>{usePotion();openStat()};openModal('m-stat')}
+/* 명예의 전당은 5분간 기억해 두고 다시 읽지 않는다 (읽기 횟수 절약) */
+let hofCache={t:0,data:null};
+async function getTop(force){if(!force&&hofCache.data&&Date.now()-hofCache.t<300000)return hofCache.data;const d=await DB.top(5);hofCache={t:Date.now(),data:d};return d}
 async function showHof(){
   openModal('m-hof');const b=$('hofBody');b.innerHTML='불러오는 중…';
-  try{const top=await DB.top(5);const med=['🥇','🥈','🥉','4️⃣','5️⃣'];
+  try{const top=await getTop();const med=['🥇','🥈','🥉','4️⃣','5️⃣'];
     b.innerHTML=top.length?'<ol>'+top.map((p,i)=>`<li>${med[i]} <b style="flex:1">${esc(p.nick)}</b><span>${JOBS[p.job]?JOBS[p.job].ic:''} Lv.${p.level}</span><span style="color:#ffd54a">💰 ${p.gold}</span></li>`).join('')+'</ol>':'<div class="dim" style="padding:14px">아직 기록이 없어요. 첫 번째 영웅이 되어 보세요!</div>'}
   catch(e){b.innerHTML='<div class="bad">불러오지 못했어요. 잠시 후 다시 시도해 주세요.</div>'}}
 $('btnHofHome').onclick=()=>{sfx('click');showHofHome()};
 async function showHofHome(){const b=$('hofBody');$('m-hof').classList.add('show');b.innerHTML='불러오는 중…';
-  try{const top=await DB.top(5);const med=['🥇','🥈','🥉','4️⃣','5️⃣'];b.innerHTML=top.length?'<ol>'+top.map((p,i)=>`<li>${med[i]} <b style="flex:1">${esc(p.nick)}</b><span>${JOBS[p.job]?JOBS[p.job].ic:''} Lv.${p.level}</span><span style="color:#ffd54a">💰 ${p.gold}</span></li>`).join('')+'</ol>':'<div class="dim" style="padding:14px">아직 기록이 없어요.</div>'}catch(e){b.innerHTML='<div class="bad">불러오지 못했어요.</div>'}}
+  try{const top=await getTop();const med=['🥇','🥈','🥉','4️⃣','5️⃣'];b.innerHTML=top.length?'<ol>'+top.map((p,i)=>`<li>${med[i]} <b style="flex:1">${esc(p.nick)}</b><span>${JOBS[p.job]?JOBS[p.job].ic:''} Lv.${p.level}</span><span style="color:#ffd54a">💰 ${p.gold}</span></li>`).join('')+'</ol>':'<div class="dim" style="padding:14px">아직 기록이 없어요.</div>'}catch(e){b.innerHTML='<div class="bad">불러오지 못했어요.</div>'}}
 
 /* ---------- 저장 ---------- */
 function packSave(){ME.seen=[...SEEN];ME.rank=rankOf(ME);ME.lastSeen=Date.now();ME.zone=Math.max(0,G.zone);ME.x=Math.round(pl.x);ME.y=Math.round(pl.y);return ME}
 let saveT=null;
-function saveSoon(){clearTimeout(saveT);saveT=setTimeout(saveNow,3000)}
-async function saveNow(){if(!ME)return;clearTimeout(saveT);try{await DB.savePlayer(packSave())}catch(e){console.warn('저장 실패',e)}}
-setInterval(()=>{if(G.run)saveNow()},45000);
-addEventListener('pagehide',()=>{if(G.run)saveNow()});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.run)saveNow()});
+/* 저장 횟수 줄이기: 변경이 생기면 '쓸 준비(dirty)'만 표시하고 25초에 한 번 모아서 저장한다.
+   레벨업·구매·게임 종료는 즉시 저장, 가만히 있어도 3분마다 한 번 접속 시각만 갱신한다(탭이 숨겨져 있으면 쉼). */
+let dirty=false;
+function saveSoon(){dirty=true;if(!saveT)saveT=setTimeout(saveNow,25000)}
+async function saveNow(){if(!ME)return;clearTimeout(saveT);saveT=null;dirty=false;try{await DB.savePlayer(packSave())}catch(e){dirty=true;console.warn('저장 실패',e)}}
+setInterval(()=>{if(G.run&&!document.hidden)saveNow()},180000);
+addEventListener('pagehide',()=>{if(G.run&&dirty)saveNow()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.run&&dirty)saveNow()});
 
 /* ---------- 게임 시작 / 종료 ---------- */
 async function startGame(){
@@ -1283,7 +1297,7 @@ async function exitGame(){G.run=false;G.busy=false;closeModals();AU.startBgm('ho
 let USER=null,PENDING=null,curCode=null,ADATA=null,tTimer=null;
 const isAdmin=u=>!!(u&&u.email&&u.email.toLowerCase()===ADMIN_EMAIL);
 const ago=t=>{if(!t)return'-';const s=Math.floor((Date.now()-t)/1000);if(s<100)return'방금';if(s<3600)return Math.floor(s/60)+'분 전';if(s<86400)return Math.floor(s/3600)+'시간 전';return Math.floor(s/86400)+'일 전'};
-const online=p=>Date.now()-(p.lastSeen||0)<100000;
+const online=p=>Date.now()-(p.lastSeen||0)<330000; // 접속 시각이 3분마다 갱신되므로 5분 30초 이내면 '접속 중'
 const zname=p=>ZONES[clamp(p.zone||0,0,5)].n;
 const acc=p=>{const t=(p.correct||0)+(p.wrong||0);return t?Math.round(p.correct/t*100)+'% ('+p.correct+'/'+t+')':'-'};
 const jobName=p=>JOBS[p.job]?JOBS[p.job].ic+JOBS[p.job].n:'-';
@@ -1327,7 +1341,7 @@ $('tIssue').onclick=async()=>{
   catch(e){warn(w,'발급에 실패했어요: '+(e.code||e.message))}
 };
 $('tList').onclick=async e=>{const b=e.target.closest('[data-act]');if(!b)return;const c=b.dataset.c;
-  if(b.dataset.act==='view'){curCode=c;await loadStudents();clearInterval(tTimer);tTimer=setInterval(()=>{if($('s-teacher').classList.contains('active')&&curCode)loadStudents(true)},20000)}
+  if(b.dataset.act==='view'){curCode=c;await loadStudents();clearInterval(tTimer);tTimer=setInterval(()=>{if(!document.hidden&&$('s-teacher').classList.contains('active')&&curCode)loadStudents(true)},60000)}
   else if(b.dataset.act==='copy'){try{await navigator.clipboard.writeText(c);toast2('코드 '+c+' 복사됨')}catch(er){prompt('코드를 복사하세요',c)}}
   else if(b.dataset.act==='del'){if(confirm('코드 '+c+' 와(과) 이 반 학생 데이터가 모두 삭제됩니다. 계속할까요?')){await withLoading(()=>DB.delClass(c),'삭제 중...',600);if(curCode===c){curCode=null;$('tDetail').style.display='none'}loadClasses()}}
 };
@@ -1343,46 +1357,66 @@ async function loadStudents(quiet){
 $('tRefresh').onclick=()=>curCode&&loadStudents();
 $('tBody').onclick=async e=>{const b=e.target.closest('[data-p]');if(!b)return;if(confirm('이 학생의 캐릭터 데이터를 삭제할까요? (되돌릴 수 없어요)')){await DB.delPlayer(b.dataset.p);loadStudents()}};
 
-/* --- 관리자 --- */
-async function openAdmin(){show('s-admin');$('aMail').textContent=USER.email+' (관리자)';await loadAdmin()}
+/* --- 관리자 (읽기 절약: 학급 목록·TOP5만 먼저 읽고, 학생은 학급을 펼칠 때 그 학급 것만 읽는다. 결과는 5분간 기억) --- */
+const ADMIN_CACHE_MS=300000,MEDALS=['🥇','🥈','🥉','4️⃣','5️⃣'];
+async function openAdmin(){show('s-admin');$('aMail').textContent=USER.email+' (관리자)';
+  if(ADATA&&ADATA.classes&&Date.now()-ADATA.t<ADMIN_CACHE_MS)renderAdmin();else await loadAdmin()}
 async function loadAdmin(){
   $('aTree').innerHTML='불러오는 중…';
-  try{const[c,p]=await Promise.all([DB.listAllClasses(),DB.listAllPlayers()]);ADATA={classes:c,players:p};renderAdmin()}
+  try{const[c,top]=await Promise.all([DB.listAllClasses(),DB.top(5)]);hofCache={t:Date.now(),data:top};ADATA={classes:c,top,byCode:{},all:false,t:Date.now()};renderAdmin()}
   catch(e){$('aTree').innerHTML='<span class="bad">불러오지 못했어요: '+esc(e.code||e.message)+'<br>Firestore 보안 규칙에 관리자 이메일이 등록되어 있는지 확인하세요.</span>'}
 }
+async function loadCode(code){ADATA.byCode[code]=await DB.listPlayers(code)}
+async function loadAllPlayers(){const p=await DB.listAllPlayers();ADATA.byCode={};ADATA.classes.forEach(c=>ADATA.byCode[c.code]=[]);p.forEach(x=>(ADATA.byCode[x.code]=ADATA.byCode[x.code]||[]).push(x));ADATA.all=true}
+async function refreshTop(){hofCache={t:0,data:null};try{ADATA.top=await getTop(true)}catch(e){}renderAdminHof()}
 function renderAdminHof(){
-  const clsBy={};ADATA.classes.forEach(c=>clsBy[c.code]=c);
-  const top=ADATA.players.slice().sort((a,b)=>(b.rank||rankOf(b))-(a.rank||rankOf(a))).slice(0,5),med=['🥇','🥈','🥉','4️⃣','5️⃣'];
-  $('aHof').innerHTML=top.length?top.map((p,i)=>{const c=clsBy[p.code]||{};return`<div class="item"><div style="font-size:26px">${med[i]}</div><div class="t"><b>${esc(p.nick)}</b> ${jobName(p)} · Lv.${p.level} · 💰${p.gold}<br><span class="dim">${esc(c.school||p.school||'')} ${c.grade||p.grade||''}학년 ${c.classNum||p.classNum||''}반 · 코드 ${p.code}</span></div><button class="btn s r" data-hof="${esc(p.id)}" data-nick="${esc(p.nick)}">🗑 삭제</button></div>`}).join(''):'아직 기록이 없어요.';
+  const clsBy={};ADATA.classes.forEach(c=>clsBy[c.code]=c);const top=ADATA.top||[];
+  $('aHof').innerHTML=top.length?top.map((p,i)=>{const c=clsBy[p.code]||{};return`<div class="item"><div style="font-size:26px">${MEDALS[i]}</div><div class="t"><b>${esc(p.nick)}</b> ${jobName(p)} · Lv.${p.level} · 💰${p.gold}<br><span class="dim">${esc(c.school||p.school||'')} ${c.grade||p.grade||''}학년 ${c.classNum||p.classNum||''}반 · 코드 ${p.code}</span></div><button class="btn s r" data-hof="${esc(p.id)}" data-nick="${esc(p.nick)}">🗑 삭제</button></div>`}).join(''):'아직 기록이 없어요.';
 }
 $('aHof').onclick=async e=>{const b=e.target.closest('[data-hof]');if(!b)return;
   if(confirm('명예의 전당의 「'+b.dataset.nick+'」 캐릭터를 삭제할까요?\n캐릭터 데이터가 완전히 삭제되며 되돌릴 수 없어요.')){
-    try{await withLoading(()=>DB.delPlayer(b.dataset.hof),'삭제 중...',600);loadAdmin()}catch(er){msgBox('삭제에 실패했어요.<br><small>'+esc(er.code||er.message)+'</small>')}}};
-function renderAdmin(){renderAdminHof();
+    try{await withLoading(()=>DB.delPlayer(b.dataset.hof),'삭제 중...',600);dropLocal(b.dataset.hof);await refreshTop()}catch(er){msgBox('삭제에 실패했어요.<br><small>'+esc(er.code||er.message)+'</small>')}}};
+function dropLocal(id){const code=id.split('_')[0],a=ADATA.byCode[code];if(a)ADATA.byCode[code]=a.filter(p=>p.id!==id);updateClassUi(code);renderStats()}
+function classBody(code){const ps=(ADATA.byCode[code]||[]).slice().sort((a,b)=>b.level-a.level);
+  return`<table><thead><tr><th>캐릭터</th><th>직업</th><th>레벨</th><th>골드</th><th>지역</th><th>정답률</th><th>상태</th><th></th></tr></thead><tbody>`+
+    (ps.length?ps.map(p=>`<tr><td><b>${esc(p.nick)}</b></td><td>${jobName(p)}</td><td>${p.level}</td><td>${p.gold}</td><td>${zname(p)}</td><td>${acc(p)}</td><td class="${online(p)?'on':'off'}">${online(p)?'🟢 접속 중':'⚪ '+ago(p.lastSeen)}</td><td><button class="btn s r" data-dp="${esc(p.id)}">삭제</button></td></tr>`).join(''):'<tr><td colspan="8" class="dim">학생 없음</td></tr>')+`</tbody></table>`}
+function pillText(code){const ps=ADATA.byCode[code];if(!ps)return'펼치면 학생을 불러와요';const av=ps.length?(ps.reduce((s,p)=>s+p.level,0)/ps.length).toFixed(1):'-';return ps.length+'명 · 평균 Lv.'+av}
+function updateClassUi(code){const b=document.querySelector('[data-body="'+code+'"]'),p=document.getElementById('pc-'+code);if(b&&ADATA.byCode[code])b.innerHTML=classBody(code);if(p)p.textContent=pillText(code)}
+function renderStats(){
   const f=$('aFilter').value.trim().toLowerCase();
-  let cls=ADATA.classes.filter(c=>!f||(c.school+c.code+(c.teacherEmail||'')).toLowerCase().includes(f));
-  const by={};ADATA.players.forEach(p=>(by[p.code]=by[p.code]||[]).push(p));
+  const cls=ADATA.classes.filter(c=>!f||(c.school+c.code+(c.teacherEmail||'')).toLowerCase().includes(f));
+  const schools=new Set(cls.map(c=>c.school));
+  let h=`<div class="stat">학교<b>${schools.size}</b></div><div class="stat">학급 코드<b>${cls.length}</b></div>`;
+  if(ADATA.all){const allP=cls.flatMap(c=>ADATA.byCode[c.code]||[]);const avg=allP.length?(allP.reduce((s,p)=>s+p.level,0)/allP.length).toFixed(1):0;
+    h+=`<div class="stat">학생<b>${allP.length}</b></div><div class="stat">평균 레벨<b>${avg}</b></div><div class="stat">접속 중<b>${allP.filter(online).length}</b></div>`}
+  else h+=`<button class="btn s" data-all="1">📊 전체 학생 통계 보기<br><small class="dim">(학생 수만큼 읽기가 발생해요)</small></button>`;
+  $('aStats').innerHTML=h}
+function renderAdmin(){renderAdminHof();renderStats();
+  const f=$('aFilter').value.trim().toLowerCase();
+  const cls=ADATA.classes.filter(c=>!f||(c.school+c.code+(c.teacherEmail||'')).toLowerCase().includes(f));
   const schools={};cls.forEach(c=>(schools[c.school]=schools[c.school]||[]).push(c));
-  const allP=cls.flatMap(c=>by[c.code]||[]);
-  const avg=allP.length?(allP.reduce((s,p)=>s+p.level,0)/allP.length).toFixed(1):0;
-  $('aStats').innerHTML=`<div class="stat">학교<b>${Object.keys(schools).length}</b></div><div class="stat">학급 코드<b>${cls.length}</b></div><div class="stat">학생<b>${allP.length}</b></div><div class="stat">평균 레벨<b>${avg}</b></div><div class="stat">접속 중<b>${allP.filter(online).length}</b></div>`;
   const names=Object.keys(schools).sort();
-  $('aTree').innerHTML=names.length?names.map(sn=>{const cs=schools[sn].sort((a,b)=>a.grade-b.grade||a.classNum-b.classNum),n=cs.reduce((s,c)=>s+(by[c.code]||[]).length,0);
-    return`<details><summary>🏫 <b>${esc(sn)}</b> <span class="pill">학급 ${cs.length}</span> <span class="pill">학생 ${n}</span></summary>`+cs.map(c=>{const ps=(by[c.code]||[]).sort((a,b)=>b.level-a.level);
-      const av=ps.length?(ps.reduce((s,p)=>s+p.level,0)/ps.length).toFixed(1):'-';
-      return`<details style="margin-left:10px"><summary>${c.grade}학년 ${c.classNum}반 · <span class="code" style="font-size:16px;letter-spacing:2px">${c.code}</span> <span class="dim">${esc(c.teacherEmail||'')}</span> <span class="pill">${ps.length}명</span> <span class="pill">평균 Lv.${av}</span>
-        <button class="btn s r" data-dc="${c.code}">코드 삭제</button></summary>
-        <div class="scroll"><table><thead><tr><th>캐릭터</th><th>직업</th><th>레벨</th><th>골드</th><th>지역</th><th>정답률</th><th>상태</th><th></th></tr></thead><tbody>`+
-        (ps.length?ps.map(p=>`<tr><td><b>${esc(p.nick)}</b></td><td>${jobName(p)}</td><td>${p.level}</td><td>${p.gold}</td><td>${zname(p)}</td><td>${acc(p)}</td><td class="${online(p)?'on':'off'}">${online(p)?'🟢 접속 중':'⚪ '+ago(p.lastSeen)}</td><td><button class="btn s r" data-dp="${esc(p.id)}">삭제</button></td></tr>`).join(''):'<tr><td colspan="8" class="dim">학생 없음</td></tr>')+
-        `</tbody></table></div></details>`}).join('')+`</details>`}).join(''):'데이터가 없어요.';
+  $('aTree').innerHTML=names.length?names.map(sn=>{const cs=schools[sn].sort((a,b)=>a.grade-b.grade||a.classNum-b.classNum);
+    return`<details><summary>🏫 <b>${esc(sn)}</b> <span class="pill">학급 ${cs.length}</span></summary>`+cs.map(c=>
+      `<details style="margin-left:10px" data-code="${c.code}"><summary>${c.grade}학년 ${c.classNum}반 · <span class="code" style="font-size:16px;letter-spacing:2px">${c.code}</span> <span class="dim">${esc(c.teacherEmail||'')}</span> <span class="pill" id="pc-${c.code}">${pillText(c.code)}</span>
+        <button class="btn s r" data-dc="${c.code}">코드 삭제</button></summary><div class="scroll" data-body="${c.code}">${ADATA.byCode[c.code]?classBody(c.code):'<div class="dim" style="padding:8px">불러오는 중…</div>'}</div></details>`).join('')+`</details>`}).join(''):'데이터가 없어요.';
 }
-$('aFilter').oninput=()=>ADATA&&renderAdmin();$('aRefresh').onclick=loadAdmin;
+// 학급을 펼칠 때 그 학급 학생만 읽는다 (toggle 이벤트는 버블링되지 않아 capture 로 받는다)
+$('aTree').addEventListener('toggle',async e=>{const d=e.target;if(!d.open||!d.dataset||!d.dataset.code)return;const code=d.dataset.code;
+  if(ADATA.byCode[code]){updateClassUi(code);return}
+  try{await loadCode(code);updateClassUi(code)}catch(er){const b=document.querySelector('[data-body="'+code+'"]');if(b)b.innerHTML='<span class="bad">불러오지 못했어요: '+esc(er.code||er.message)+'</span>'}},true);
+$('aStats').onclick=async e=>{if(!e.target.closest('[data-all]'))return;
+  try{await withLoading(loadAllPlayers,'전체 학생 불러오는 중...',600);renderAdmin()}catch(er){msgBox('불러오지 못했어요.<br><small>'+esc(er.code||er.message)+'</small>')}};
+$('aFilter').oninput=()=>ADATA&&ADATA.classes&&renderAdmin();
+$('aRefresh').onclick=loadAdmin;
 $('aTree').onclick=async e=>{const dc=e.target.closest('[data-dc]'),dp=e.target.closest('[data-dp]');
   if(dc){e.preventDefault();if(confirm('코드 '+dc.dataset.dc+' 와(과) 소속 학생 데이터를 모두 삭제할까요?')){await withLoading(()=>DB.delClass(dc.dataset.dc),'삭제 중...',600);loadAdmin()}}
-  if(dp){if(confirm('이 학생 데이터를 삭제할까요?')){await DB.delPlayer(dp.dataset.dp);loadAdmin()}}};
-$('aCsv').onclick=()=>{if(!ADATA)return;const by={};ADATA.players.forEach(p=>(by[p.code]=by[p.code]||[]).push(p));
+  if(dp){if(confirm('이 학생 데이터를 삭제할까요?')){try{await DB.delPlayer(dp.dataset.dp);dropLocal(dp.dataset.dp);refreshTop()}catch(er){msgBox('삭제에 실패했어요.<br><small>'+esc(er.code||er.message)+'</small>')}}}};
+$('aCsv').onclick=async()=>{if(!ADATA||!ADATA.classes)return;
+  try{if(!ADATA.all)await withLoading(loadAllPlayers,'전체 학생 불러오는 중...',600)}catch(er){return msgBox('불러오지 못했어요.<br><small>'+esc(er.code||er.message)+'</small>')}
+  renderStats();
   const rows=[['학교','학년','반','코드','교사','캐릭터','직업','레벨','경험치','골드','처치','정답','오답','마지막접속']];
-  ADATA.classes.forEach(c=>(by[c.code]||[{}]).forEach(p=>rows.push([c.school,c.grade,c.classNum,c.code,c.teacherEmail||'',p.nick||'',p.job?JOBS[p.job].n:'',p.level||'',p.exp||'',p.gold||'',p.kills||'',p.correct||'',p.wrong||'',p.lastSeen?new Date(p.lastSeen).toLocaleString():''])));
+  ADATA.classes.forEach(c=>{const ps=ADATA.byCode[c.code]||[];(ps.length?ps:[{}]).forEach(p=>rows.push([c.school,c.grade,c.classNum,c.code,c.teacherEmail||'',p.nick||'',p.job?JOBS[p.job].n:'',p.level||'',p.exp||'',p.gold||'',p.kills||'',p.correct||'',p.wrong||'',p.lastSeen?new Date(p.lastSeen).toLocaleString():'']))});
   const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='분수마스터_데이터.csv';a.click()};
 
@@ -1473,6 +1507,7 @@ function homeFrame(ms){
   const g=hx.createLinearGradient(0,HH*.55,0,HH);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,20,.55)');hx.fillStyle=g;hx.fillRect(0,HH*.55,HW,HH);
   requestAnimationFrame(homeFrame);
 }
+try{if(localStorage.getItem('wm_mute')==='1'){AU.toggle();setMuteUi(true)}}catch(e){} // 지난번에 소리를 껐다면 그대로 유지
 AU.startBgm('home');
 startHome();
 
