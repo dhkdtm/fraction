@@ -129,6 +129,8 @@ body.touch #touch{display:block}
 #qMon{width:72px;height:72px;image-rendering:pixelated;background:#0006;border-radius:10px;border:2px solid #000}
 #qTag{display:inline-block;padding:2px 10px;border-radius:99px;background:#345;font-size:14px}
 #qTag.w{background:#b45309;color:#fff}
+#qRate{font-size:14px;margin-top:8px;color:#a9c6ff}#qRate.low{color:#ffb4b4;background:#5a1a1a;border:2px solid var(--bad);border-radius:8px;padding:4px 8px}
+#hAcc{font-size:13px;margin-top:2px}#hAcc.low{color:#ff8a8a}
 #qBody{font-size:clamp(20px,4.6vw,30px);line-height:1.8;margin:12px 0;background:#0004;padding:10px 14px;border-radius:10px}
 #qOpts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .opt{font-size:clamp(20px,4.4vw,28px);padding:12px 8px;background:#3b4a8a;color:#fff;border:3px solid #000;border-radius:12px;cursor:pointer;box-shadow:0 4px 0 #000;min-height:64px}
@@ -245,7 +247,7 @@ body.touch #touch{display:block}
     <div class="mb" id="xpb"><i></i></div>
     <div>❤ <span id="hHp"></span></div><div class="mb" id="hpb"><i></i></div>
     <div>💰 <b id="hGold" style="color:#ffd54a">0</b> · 🧪 <span id="hPot">0</span></div>
-    <div class="dim" id="hZone"></div></div>
+    <div class="dim" id="hZone"></div><div id="hAcc"></div></div>
   <div class="hud" id="hudR"><div class="bt">
     <button class="hb" id="bShop">🛒 상점</button><button class="hb" id="bStat">🎒 상태</button>
     <button class="hb" id="bHof">🏆</button><button class="hb" id="bMute">🔊</button><button class="hb" id="bExit">⏏</button></div>
@@ -263,11 +265,13 @@ body.touch #touch{display:block}
 <!-- 문제 모달 -->
 <div class="modal" id="m-q"><div class="box">
   <div id="qHead"><canvas id="qMon" width="18" height="18"></canvas><div><div id="qName" style="font-size:22px;color:#ffd54a"></div><span id="qTag"></span></div></div>
+  <div id="qRate"></div>
   <div id="qBody"></div>
   <div id="qOpts"></div>
   <div id="qRes"></div>
   <div id="qExp"></div>
   <button class="btn g" id="qNext" style="display:none">계속하기 ▶ (Enter)</button>
+  <button class="btn d" id="qExit" style="display:none">그만하고 나가기</button>
 </div></div>
 
 <!-- 상점 -->
@@ -1047,41 +1051,88 @@ function usePotion(){if(pl.dead||G.quiz||G.busy)return;const s=stats();if(pl.hp>
   ME[id]--;pl.hp=Math.min(s.maxhp,pl.hp+s.maxhp*(id==='pot1'?.5:1));sfx('potion');burst(pl.x,pl.y,'#5be37d',10,40);ftext(pl.x,pl.y-12,'HP 회복!','#5be37d');hud();saveSoon()}
 
 /* ---------- 문제 풀이 ---------- */
+/* 학습 규칙
+   1) 틀린 문제는 경험치·골드를 한 푼도 주지 않는다. (틀렸다가 나중에 맞혀도 그 만남에서는 보상 없음)
+   2) 내 정답률이 70% 이하이면, 틀렸을 때 새 문제로 계속 이어져 맞출 때까지 끝나지 않는다. */
+const PASS_RATE=0.7;
+/* 정답률은 '최근 50문제' 기준 (오래된 기록은 밀려난다). 전체 누적(correct/wrong)은 교사 통계용으로 따로 유지 */
+const WIN=50;
+const rec=()=>ME.recent||(ME.recent=[]);
+const recStats=()=>{const r=rec();let c=0;for(const x of r)c+=x;return{c,t:r.length}};
+const accRate=()=>{const s=recStats();return s.t?s.c/s.t:1};
+function pushRecent(ok){const r=rec();r.push(ok?1:0);while(r.length>WIN)r.shift()}
+function streakNeeded(){ // 목표 정답률에 닿으려면 연속으로 몇 문제를 맞혀야 하는지 (오래된 기록이 밀려나는 것까지 계산)
+  const r=rec().slice();for(let k=0;k<=WIN*2;k++){let c=0;for(const x of r)c+=x;if(!r.length||c/r.length>=REM_RATE)return k;r.push(1);while(r.length>WIN)r.shift()}return WIN}
+/* 복습 모드: 20문제 이상 풀었는데 정답률이 60% 미만이면, 접속할 때 정답률이 60%가 될 때까지 문제만 나온다 (보상 없음) */
+const REM_MIN=20,REM_RATE=0.6;
+const needRemedial=()=>{const s=recStats();return s.t>=REM_MIN&&s.c/s.t<REM_RATE};
+function startRemedial(){
+  G.quiz=true;G.rem=true;G.qm=null;for(const k in keys)keys[k]=false;ATK=false;
+  G.qTier=clamp((ME.zone||0)+1,1,6);G.qWord=Math.random()<.3;G.qWrong=0;G.mustRetry=false;
+  $('qName').textContent='📚 복습 시간!';
+  const mc=$('qMon'),im=SPR.player[ME.job][0];mc.width=im.width;mc.height=im.height;const c2=mc.getContext('2d');c2.imageSmoothingEnabled=false;c2.clearRect(0,0,mc.width,mc.height);c2.drawImage(im,0,0);
+  $('qExit').style.display='block';$('m-q').classList.add('show');sfx('quiz');showQuestion();
+}
+function finishRemedial(){G.rem=false;G.quiz=false;G.q=null;$('qExit').style.display='none';$('m-q').classList.remove('show');sfx('level');banner('복습 완료!<br>이제 모험을 떠나요',2200);saveNow();hud()}
+$('qExit').onclick=()=>{$('m-q').classList.remove('show');G.quiz=false;G.rem=false;$('qExit').style.display='none';exitGame()};
 function startQuiz(m){
   m.state='quiz';G.quiz=true;G.qm=m;for(const k in keys)keys[k]=false;ATK=false;
   let tier=m.z+1;if(!m.boss){const r=Math.random();if(r<.15)tier--;else if(r>.85)tier++}tier=clamp(tier,1,6);
-  const word=m.boss||Math.random()<.3;
-  const q=QB.next(tier,word,SEEN);G.q=q;G.qDone=false;
+  G.qTier=tier;G.qWord=m.boss||Math.random()<.3;G.qWrong=0;G.mustRetry=false;
   $('qName').textContent=(m.boss?'👹 보스 ':'')+m.def.n+(m.boss?` (${Math.min(3,m.phase+1)}/3 단계)`:'')+'이(가) 나타났다!';
-  const tg=$('qTag');tg.className=q.word?'w':'';tg.textContent=q.word?'📝 문장제 문제 · 경험치와 골드 2배!':'📖 분수 계산 문제';
   const mc=$('qMon');mc.width=m.spr[0].width;mc.height=m.spr[0].height;const c2=mc.getContext('2d');c2.imageSmoothingEnabled=false;c2.clearRect(0,0,mc.width,mc.height);c2.drawImage(m.spr[0],0,0);
+  $('m-q').classList.add('show');sfx('quiz');if(m.boss)sfx('boss');
+  showQuestion();
+}
+function showQuestion(){ // 새 문제를 보여 준다 (처음 + 다시 풀기)
+  if(G.rem)G.qWord=Math.random()<.3;
+  const q=QB.next(G.qTier,G.qWord,SEEN);G.q=q;G.qDone=false;
+  const tg=$('qTag');tg.className=q.word?'w':'';
+  tg.textContent=G.rem?'📚 복습 문제 · 보상은 없고, 정답률 60%가 되면 게임을 할 수 있어요':G.qWrong>0?'🔁 다시 풀기 · 이번 만남은 경험치·골드가 없어요':(q.word?'📝 문장제 문제 · 경험치와 골드 2배!':'📖 분수 계산 문제');
   $('qBody').innerHTML=q.q;
   $('qOpts').innerHTML=q.opts.map((o,i)=>`<button class="opt" data-i="${i}"><span class="k">${i+1}</span>${o.h}</button>`).join('');
   $('qOpts').querySelectorAll('.opt').forEach(b=>b.onclick=()=>answerQ(+b.dataset.i));
   $('qRes').style.display='none';$('qExp').style.display='none';$('qNext').style.display='none';
-  $('m-q').classList.add('show');sfx('quiz');if(m.boss)sfx('boss');
+  renderRate();
+}
+function renderRate(){
+  if(G.rem){const{c,t}=recStats(),k=streakNeeded(),el=$('qRate');
+    el.className=k>0?'low':'';el.innerHTML=`📚 복습 중 · 최근 ${t}문제 정답률 <b>${t?Math.round(c/t*100):0}%</b> (${c}/${t}) → 목표 <b>60%</b>`+(k>0?` · 연속으로 <b>${k}문제</b> 맞히면 돼요`:' · 목표 달성!');return}
+  const{c:cc,t}=recStats(),r=accRate(),el=$('qRate'),low=t>0&&r<=PASS_RATE;
+  el.className=low?'low':'';
+  el.innerHTML=t?`🎯 최근 ${t}문제 정답률 <b>${Math.round(r*100)}%</b> (${cc}/${t}) · `+(low?'<b>70% 이하!</b> 틀리면 맞출 때까지 계속 풀어야 해요':'70% 이하가 되면 틀릴 때 맞출 때까지 계속 풀어야 해요'):'🎯 정답률이 70% 이하가 되면 틀릴 때 맞출 때까지 계속 풀어야 해요';
 }
 function answerQ(i){
-  if(G.qDone||!G.q)return;G.qDone=true;const q=G.q,ok=q.opts[i]&&q.opts[i].ok;
+  if(G.qDone||!G.q)return;G.qDone=true;const q=G.q,ok=!!(q.opts[i]&&q.opts[i].ok);
   const bs=$('qOpts').querySelectorAll('.opt');bs.forEach((b,k)=>{b.disabled=true;if(q.opts[k].ok)b.classList.add('right');else if(k===i)b.classList.add('wrong')});
-  SEEN.add(q.id);ok?ME.correct++:ME.wrong++;G.qOk=ok;
-  const r=$('qRes');r.style.display='block';r.innerHTML=ok?'<span class="ok">⭕ 정답이에요! 멋져요!</span>':'<span class="bad">❌ 아쉬워요! 다시 도전해 봐요.</span>';
+  SEEN.add(q.id);ok?ME.correct++:ME.wrong++;pushRecent(ok);G.qOk=ok;
+  if(!ok){G.qWrong++;G.mustRetry=accRate()<=PASS_RATE}
+  renderRate();
+  const r=$('qRes');r.style.display='block';
+  r.innerHTML=ok?(G.qWrong?'<span class="ok">⭕ 정답이에요!</span> <span class="bad" style="font-size:.7em">앞에서 틀려서 이번엔 경험치·골드가 없어요</span>':'<span class="ok">⭕ 정답이에요! 멋져요!</span>')
+    :(G.mustRetry?'<span class="bad">❌ 틀렸어요!</span> <span style="font-size:.7em">정답률이 70% 이하라 <b>맞출 때까지 새 문제</b>가 계속 나와요. 경험치·골드도 없어요.</span>'
+                  :'<span class="bad">❌ 아쉬워요!</span> <span style="font-size:.7em">틀리면 경험치·골드를 받을 수 없어요.</span>');
+  if(G.rem)r.innerHTML=ok?'<span class="ok">⭕ 정답이에요!</span>':'<span class="bad">❌ 틀렸어요!</span> <span style="font-size:.7em">풀이를 읽고 다음 문제에 도전해요.</span>';
   sfx(ok?'correct':'wrong');
   const e=$('qExp');e.style.display='block';e.innerHTML='💡 <b>풀이</b><br>'+q.ex;
-  const n=$('qNext');n.style.display='block';n.onclick=nextQ;
+  const n=$('qNext');n.style.display='block';n.textContent=G.rem?(accRate()>=REM_RATE?'복습 끝! 게임하러 가기 ▶ (Enter)':'다음 문제 ▶ (Enter)'):(!ok&&G.mustRetry)?'새 문제로 다시 풀기 ▶ (Enter)':'계속하기 ▶ (Enter)';n.onclick=nextQ;
 }
 function nextQ(){
-  if(!G.qDone)return;const m=G.qm,q=G.q,ok=G.qOk;$('m-q').classList.remove('show');G.quiz=false;G.q=null;G.qm=null;
-  quizDone(m,ok,q);saveSoon();hud();
+  if(!G.qDone)return;
+  if(G.rem){saveSoon();if(accRate()>=REM_RATE){finishRemedial();return}showQuestion();return} // 복습: 정답률 60%가 될 때까지 문제만 계속
+  if(!G.qOk&&G.mustRetry){showQuestion();return} // 정답률 70% 이하: 맞출 때까지 끝나지 않는다
+  const m=G.qm,q=G.q,ok=G.qOk,noReward=G.qWrong>0;$('m-q').classList.remove('show');G.quiz=false;G.q=null;G.qm=null;
+  quizDone(m,ok,q,noReward);saveSoon();hud();
 }
-function quizDone(m,ok,q){
+function quizDone(m,ok,q,noReward){
   if(ok){
-    if(m.boss&&m.phase<2){reward(m,q,.4);m.phase++;m.state='idle';m.stun=1.2;m.hp=Math.round([.66,.33][m.phase-1]*m.maxhp);toast('🔥 보스가 화가 났다! 탄막을 조심하세요!');bossShoot(m,true)}
-    else{reward(m,q,m.boss?3:1);kill(m)}
+    if(noReward)toast('틀린 문제가 있어서 이번엔 경험치와 골드를 받지 못했어요. 다음엔 한 번에 맞혀 봐요!',3500);
+    if(m.boss&&m.phase<2){if(!noReward)reward(m,q,.4);m.phase++;m.state='idle';m.stun=1.2;m.hp=Math.round([.66,.33][m.phase-1]*m.maxhp);setTimeout(()=>toast('🔥 보스가 화가 났다! 탄막을 조심하세요!'),noReward?3600:0);bossShoot(m,true)}
+    else{if(!noReward)reward(m,q,m.boss?3:1);kill(m)}
   }else{
     m.state='idle';m.stun=.8;pl.inv=1.5;
     if(m.boss)m.hp=Math.min(m.maxhp,m.hp+Math.round(m.maxhp*(m.phase===2?.25:.12)));else m.hp=Math.ceil(m.maxhp*.5);
-    toast('몬스터가 기운을 되찾았어요! 다시 공격해요.');
+    toast('틀려서 경험치와 골드는 없어요. 몬스터가 기운을 되찾았어요!');
   }
 }
 function reward(m,q,sc){
@@ -1213,7 +1264,8 @@ function hud(){if(!ME)return;const s=stats();
   $('hLv').textContent=ME.level;const nx=need(ME.level);$('hXp').textContent=ME.level>=MAXLV?'MAX':ME.exp+' / '+nx;
   $('xpb').firstElementChild.style.width=(ME.level>=MAXLV?100:clamp(ME.exp/nx*100,0,100))+'%';
   $('hHp').textContent=Math.ceil(pl.hp)+' / '+s.maxhp;$('hpb').firstElementChild.style.width=clamp(pl.hp/s.maxhp*100,0,100)+'%';
-  $('hGold').textContent=ME.gold;$('hPot').textContent=ME.pot1+ME.pot2;$('hZone').textContent='📍 '+ZONES[Math.max(0,G.zone)].n}
+  $('hGold').textContent=ME.gold;$('hPot').textContent=ME.pot1+ME.pot2;$('hZone').textContent='📍 '+ZONES[Math.max(0,G.zone)].n;
+  const tt=recStats().t,rt=accRate(),lw=tt>0&&rt<=PASS_RATE;$('hAcc').className=lw?'low':'';$('hAcc').textContent=tt?'🎯 최근 '+tt+'문제 정답률 '+Math.round(rt*100)+'%'+(lw?' (70% 이하!)':''):'🎯 정답률 -'}
 
 /* ---------- 상점 / 상태 / 명예의 전당 ---------- */
 let shopTab='w';
@@ -1251,7 +1303,7 @@ function openStat(){const s=stats(),tot=ME.correct+ME.wrong;
   <tr><td>🗡 무기</td><td>${s.w.n}</td><td>🛡 방어구</td><td>${s.a.n}</td></tr>
   <tr><td>🧪 물약</td><td>${ME.pot1} / ${ME.pot2}(고급)</td><td>🎒 장신구</td><td>${ME.acc.length?ME.acc.map(i=>ACC.find(a=>a.id===i).ic).join(' '):'없음'}</td></tr>
   <tr><td>👾 처치</td><td>${ME.kills}마리</td><td>👑 보스 격파</td><td>${ME.bosses.length}/6</td></tr>
-  <tr><td>✅ 정답</td><td>${ME.correct}개</td><td>📊 정답률</td><td>${tot?Math.round(ME.correct/tot*100):0}%</td></tr></tbody></table></div>
+  <tr><td>✅ 정답</td><td>${ME.correct}개</td><td>📊 정답률</td><td>최근 ${Math.round(accRate()*100)}% · 전체 ${tot?Math.round(ME.correct/tot*100):0}%</td></tr></tbody></table></div>
   <button class="btn g" id="stPot">🧪 물약 사용 (Q)</button>`;
   $('stPot').onclick=()=>{usePotion();openStat()};openModal('m-stat')}
 /* 명예의 전당은 5분간 기억해 두고 다시 읽지 않는다 (읽기 횟수 절약) */
@@ -1290,7 +1342,8 @@ async function startGame(){
   show('s-game');$('bossbar').style.display='none';hud();
   await sleep(1800);
   G.run=true;G.busy=false;lastT=performance.now();requestAnimationFrame(frame);loadingOff();
-  setTimeout(()=>toast('몬스터의 체력을 0으로 만들면 분수 문제가 나와요! 정답을 맞혀 물리치세요 💪',4500),1200);
+  if(needRemedial())startRemedial();
+  else setTimeout(()=>toast('몬스터의 체력을 0으로 만들면 분수 문제가 나와요! 정답을 맞혀 물리치세요 💪',4500),1200);
 }
 async function exitGame(){G.run=false;G.busy=false;closeModals();AU.startBgm('home');loadingOn('저장하는 중...');await saveNow();await sleep(900);ME=null;loadingOff();show('s-home')}
 /* ================= 화면 흐름 (교사 / 관리자 / 학생) ================= */
@@ -1299,7 +1352,8 @@ const isAdmin=u=>!!(u&&u.email&&u.email.toLowerCase()===ADMIN_EMAIL);
 const ago=t=>{if(!t)return'-';const s=Math.floor((Date.now()-t)/1000);if(s<100)return'방금';if(s<3600)return Math.floor(s/60)+'분 전';if(s<86400)return Math.floor(s/3600)+'시간 전';return Math.floor(s/86400)+'일 전'};
 const online=p=>Date.now()-(p.lastSeen||0)<330000; // 접속 시각이 3분마다 갱신되므로 5분 30초 이내면 '접속 중'
 const zname=p=>ZONES[clamp(p.zone||0,0,5)].n;
-const acc=p=>{const t=(p.correct||0)+(p.wrong||0);return t?Math.round(p.correct/t*100)+'% ('+p.correct+'/'+t+')':'-'};
+const acc=p=>{const t=(p.correct||0)+(p.wrong||0);if(!t)return'-';const r=Array.isArray(p.recent)?p.recent:[];const rc=r.reduce((s,x)=>s+x,0);
+  return (r.length?'최근 '+Math.round(rc/r.length*100)+'% · ':'')+'전체 '+Math.round(p.correct/t*100)+'% ('+p.correct+'/'+t+')'};
 const jobName=p=>JOBS[p.job]?JOBS[p.job].ic+JOBS[p.job].n:'-';
 
 DB.onAuth(u=>{USER=u});
@@ -1439,8 +1493,13 @@ $('sGo').onclick=async()=>{
   }catch(e){warn(w,'접속에 실패했어요. 인터넷 연결을 확인해 주세요. ('+(e.code||e.message)+')')}
 };
 function fixPlayer(p){const d=newPlayerData(p.job||'warrior',{code:p.code,school:p.school,grade:p.grade,classNum:p.classNum},p.nick);
-  const m=Object.assign(d,p);['ownedW','ownedA','acc','bosses','seen'].forEach(k=>{if(!Array.isArray(m[k]))m[k]=d[k]});return m}
-function newPlayerData(job,c,nick){return{id:pid(c.code,nick),code:c.code,nick,job,school:c.school||'',grade:c.grade||0,classNum:c.classNum||0,level:1,exp:0,gold:0,weapon:0,armor:0,ownedW:[0],ownedA:[0],acc:[],pot1:2,pot2:0,zone:0,x:0,y:0,kills:0,correct:0,wrong:0,bosses:[],seen:[],createdAt:Date.now(),lastSeen:Date.now(),rank:rankOf({level:1,gold:0})}}
+  const m=Object.assign(d,p);['ownedW','ownedA','acc','bosses','seen'].forEach(k=>{if(!Array.isArray(m[k]))m[k]=d[k]});
+  if(!Array.isArray(p.recent)){ // 예전 저장 데이터: 전체 정답률을 유지한 채 최근 기록을 만들어 준다 (정답/오답을 고르게 섞어서)
+    const t=(m.correct||0)+(m.wrong||0),n=Math.min(50,t),c=t?Math.round(n*m.correct/t):0,r=[];
+    for(let i=0;i<n;i++)r.push(Math.floor((i+1)*c/n)>Math.floor(i*c/n)?1:0); // 정답 c개를 고르게 배치
+    m.recent=r}
+  return m}
+function newPlayerData(job,c,nick){return{id:pid(c.code,nick),code:c.code,nick,job,school:c.school||'',grade:c.grade||0,classNum:c.classNum||0,level:1,exp:0,gold:0,weapon:0,armor:0,ownedW:[0],ownedA:[0],acc:[],pot1:2,pot2:0,zone:0,x:0,y:0,kills:0,correct:0,wrong:0,recent:[],bosses:[],seen:[],createdAt:Date.now(),lastSeen:Date.now(),rank:rankOf({level:1,gold:0})}}
 function showJob(){
   $('jobSub').innerHTML='<b style="color:#ffd54a">'+esc(PENDING.nick)+'</b> 님의 캐릭터를 골라 주세요. (한 번 정하면 바꿀 수 없어요)';
   const L=$('jobList');L.innerHTML='';
